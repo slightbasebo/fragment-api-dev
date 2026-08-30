@@ -1,0 +1,511 @@
+openapi: 3.1.0
+info:
+  title: Fragment Stars & Premium API
+  version: 1.2.0
+  description: Buy Telegram Stars and Premium with GRAM or USDT on TON. No API key required.
+  contact:
+    name: Integration support
+    url: https://github.com/slightbasebo/fragment-api-dev/issues
+  license:
+    name: MIT
+    identifier: MIT
+externalDocs:
+  description: Quick start and examples
+  url: https://github.com/slightbasebo/fragment-api-dev
+servers:
+  - url: https://api-stars.duckdns.org
+security: []
+paths:
+  /api/v1/purchases:
+    post:
+      operationId: createPurchase
+      summary: Create a Stars or Premium purchase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePurchase'
+      responses:
+        '202':
+          description: Purchase accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseAccepted'
+        '400':
+          $ref: '#/components/responses/InvalidPurchase'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/ServerError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/wallets/resolve:
+    post:
+      operationId: resolveWallet
+      summary: Find or verify a 12-word wallet account
+      description: >-
+        Send seed with wallet_address to find its account index, seed with account_index
+        to use V5R1 at that index, or all three fields to verify an exact wallet.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WalletResolutionRequest'
+      responses:
+        '200':
+          description: Wallet account resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletResolution'
+        '400':
+          description: Invalid wallet selection
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ActionableError'
+                  - $ref: '#/components/schemas/PublicError'
+        '429':
+          description: Wallet resolver capacity exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionableError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/purchases/{purchase_id}:
+    get:
+      operationId: getPurchase
+      summary: Get purchase status
+      parameters:
+        - name: purchase_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Current purchase state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Purchase'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/prices:
+    get:
+      operationId: getPrices
+      summary: Get the 50-Stars reference and Premium price catalog
+      description: Prices are informational and are refreshed when Fragment creates a purchase invoice.
+      responses:
+        '200':
+          description: Current price catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PriceCatalog'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/prices/quote:
+    get:
+      operationId: getPriceQuote
+      summary: Get a Stars or Premium price quote
+      description: The quote is informational and is not fixed for a later purchase.
+      parameters:
+        - name: product
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [stars, premium]
+        - name: amount
+          in: query
+          required: true
+          description: Stars accepts 50 to 1,000,000; Premium accepts 3, 6, or 12 months.
+          schema:
+            type: integer
+            minimum: 3
+      responses:
+        '200':
+          description: Price quote
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PriceQuote'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /health:
+    get:
+      operationId: getHealth
+      summary: Check API readiness
+      responses:
+        '200':
+          description: API is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: API is temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+components:
+  schemas:
+    Prices:
+      type: object
+      additionalProperties: false
+      required: [gram, usdt]
+      properties:
+        gram:
+          type: string
+          description: Exact GRAM amount as a decimal string.
+        usdt:
+          type: string
+          description: Exact USDT amount as a decimal string.
+    StarsPrice:
+      type: object
+      additionalProperties: false
+      required: [amount, prices]
+      properties:
+        amount:
+          type: integer
+          const: 50
+        prices:
+          $ref: '#/components/schemas/Prices'
+    PremiumPrice:
+      type: object
+      additionalProperties: false
+      required: [months, prices]
+      properties:
+        months:
+          type: integer
+          enum: [3, 6, 12]
+        prices:
+          $ref: '#/components/schemas/Prices'
+    PriceCatalog:
+      type: object
+      additionalProperties: false
+      required: [stars, premium, stale]
+      properties:
+        stars:
+          $ref: '#/components/schemas/StarsPrice'
+        premium:
+          type: array
+          items:
+            $ref: '#/components/schemas/PremiumPrice'
+        stale:
+          type: boolean
+          description: True when the latest available catalog is being served.
+    PriceQuote:
+      type: object
+      additionalProperties: false
+      required: [product, amount, prices, stale]
+      properties:
+        product:
+          type: string
+          enum: [stars, premium]
+        amount:
+          type: integer
+        prices:
+          $ref: '#/components/schemas/Prices'
+        stale:
+          type: boolean
+          description: True when the latest available quote is being served.
+    WalletResolutionRequest:
+      type: object
+      additionalProperties: false
+      required: [seed]
+      description: >-
+        A 12-word seed requires wallet_address or account_index. Send both selectors
+        to verify an exact wallet.
+      properties:
+        seed:
+          type: string
+          minLength: 1
+          description: A 12-word BIP39 mnemonic, as plain text or Base64-wrapped text.
+        wallet_address:
+          type: string
+          minLength: 1
+          description: TON friendly or raw address used to find or verify the account.
+        account_index:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Known account index. Without wallet_address, V5R1 is selected.
+      anyOf:
+        - required: [wallet_address]
+        - required: [account_index]
+    WalletAddresses:
+      type: object
+      additionalProperties: false
+      required: [v4, v5r1]
+      properties:
+        v4:
+          type: string
+        v5r1:
+          type: string
+    WalletResolution:
+      type: object
+      additionalProperties: false
+      required:
+        - wallet_address
+        - wallet_version
+        - account_index
+        - derivation_path
+        - addresses
+      properties:
+        wallet_address:
+          type: string
+          description: The exact wallet selected by the request.
+        wallet_version:
+          type: string
+          enum: [v4, v5r1]
+        account_index:
+          type: integer
+          minimum: 0
+          maximum: 100
+        derivation_path:
+          type: string
+          example: m/44'/607'/20'
+        addresses:
+          $ref: '#/components/schemas/WalletAddresses'
+    CreatePurchase:
+      type: object
+      additionalProperties: false
+      required:
+        - product
+        - username
+        - amount
+        - payment_method
+        - seed
+        - idempotency_key
+      properties:
+        product:
+          type: string
+          enum: [stars, premium]
+        username:
+          type: string
+          pattern: '^@[A-Za-z0-9_]{1,32}$'
+        amount:
+          type: integer
+          minimum: 1
+        payment_method:
+          type: string
+          enum: [gram, usdt]
+        seed:
+          type: string
+          minLength: 1
+        wallet_address:
+          type: string
+          minLength: 1
+          description: Optional TON address used to find or verify a 12-word wallet account.
+        account_index:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Optional account index. With a 12-word seed alone, this selects V5R1.
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: '^[ -~]+$'
+      allOf:
+        - if:
+            properties:
+              product:
+                const: stars
+          then:
+            properties:
+              amount:
+                minimum: 50
+        - if:
+            properties:
+              product:
+                const: premium
+          then:
+            properties:
+              amount:
+                enum: [3, 6, 12]
+    PurchaseAccepted:
+      type: object
+      additionalProperties: false
+      required: [purchase_id, status, status_url]
+      properties:
+        purchase_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/PurchaseStatus'
+        status_url:
+          type: string
+    Purchase:
+      type: object
+      additionalProperties: false
+      required:
+        - purchase_id
+        - status
+        - product
+        - username
+        - amount
+        - payment_method
+        - error
+        - created_at
+        - updated_at
+      properties:
+        purchase_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/PurchaseStatus'
+        product:
+          type: string
+          enum: [stars, premium]
+        username:
+          type: string
+        amount:
+          type: integer
+        payment_method:
+          type: string
+          enum: [gram, usdt]
+        transaction_hash:
+          type: string
+        error:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/PurchaseError'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PurchaseStatus:
+      type: string
+      enum:
+        - queued
+        - preparing
+        - sending
+        - submitted
+        - confirming
+        - completed
+        - failed
+        - reconciliation_required
+    PurchaseError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+        timestamp:
+          type: string
+          format: date-time
+    PublicError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: string
+    WalletSelectionExample:
+      type: object
+      additionalProperties: false
+      required: [seed]
+      properties:
+        seed:
+          type: string
+        wallet_address:
+          type: string
+        account_index:
+          type: integer
+          minimum: 0
+          maximum: 100
+    ActionableError:
+      type: object
+      additionalProperties: false
+      required: [code, error, action]
+      properties:
+        code:
+          type: string
+        error:
+          type: string
+        action:
+          type: string
+        examples:
+          type: array
+          items:
+            $ref: '#/components/schemas/WalletSelectionExample'
+  responses:
+    InvalidPurchase:
+      description: Invalid purchase or wallet selection
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/PublicError'
+              - $ref: '#/components/schemas/ActionableError'
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PublicError'
+    NotFound:
+      description: Purchase not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PublicError'
+    Conflict:
+      description: Idempotency key conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PublicError'
+    RateLimited:
+      description: Request capacity exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PublicError'
+    ServerError:
+      description: Request could not be processed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PublicError'
+    Unavailable:
+      description: Service temporarily unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PublicError'
