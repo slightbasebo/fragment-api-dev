@@ -11,7 +11,7 @@
 
 **Free · No API key · Python SDK + REST API · GRAM + USDT on TON**
 
-**[Quick start](#quick-start)** · **[Examples](examples/README.md)** · **[Prices](#prices)** · **[OpenAPI](openapi.yaml)**
+**[Quick start](#quick-start)** · **[Examples](examples/README.md)** · **[AI skill](#ai-assisted-integration)** · **[Prices](#prices)** · **[OpenAPI](openapi.yaml)**
 
 </div>
 
@@ -75,6 +75,26 @@ The [`examples/`](examples/README.md) directory contains explained examples for:
 
 USDT purchases require a small GRAM balance for TON network fees.
 
+## AI-assisted integration
+
+Install the same portable skill for Codex or Claude:
+
+```bash
+# Codex
+cp -R skills/fragment-api-integration "${CODEX_HOME:-$HOME/.codex}/skills/"
+
+# Claude
+cp -R skills/fragment-api-integration "$HOME/.claude/skills/"
+```
+
+Then ask your coding agent:
+
+```text
+Use $fragment-api-integration to add Telegram Stars purchases to this project.
+```
+
+The skill covers Python SDK and REST integrations, Stars and Premium, GRAM and USDT, wallet selection, idempotency, polling, and safe error handling.
+
 ## Prices
 
 Get an informational quote without creating a purchase:
@@ -102,6 +122,7 @@ Price values are exact decimal strings. Fragment creates a fresh quote when the 
 | Resource | Link |
 |---|---|
 | All examples | [`examples/README.md`](examples/README.md) |
+| AI integration skill | [`skills/fragment-api-integration`](skills/fragment-api-integration/SKILL.md) |
 | Python SDK | [`fragment-api-dev`](https://pypi.org/project/fragment-api-dev/) |
 | REST API specification | [`openapi.yaml`](openapi.yaml) |
 | Production endpoint | [`https://api-stars.duckdns.org`](https://api-stars.duckdns.org/health) |
