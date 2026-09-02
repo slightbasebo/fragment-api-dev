@@ -11,7 +11,7 @@
 
 **Free · No API key · Python SDK + REST API · GRAM + USDT on TON**
 
-**[Quick start](#quick-start)** · **[Examples](examples/README.md)** · **[AI skill](#ai-assisted-integration)** · **[Prices](#prices)** · **[OpenAPI](openapi.yaml)**
+**[Check availability](#check-before-charging)** · **[Quick start](#quick-start)** · **[Examples](examples/README.md)** · **[AI skill](#ai-assisted-integration)** · **[Prices](#prices)** · **[OpenAPI](openapi.yaml)**
 
 </div>
 
@@ -26,10 +26,35 @@ Fragment API gives shops, Telegram bots, and backend services a simple way to bu
 
 API access is free. You pay only the Fragment purchase amount and TON network fees.
 
+## Check before charging
+
+Check whether the recipient can receive the purchase **before accepting customer payment**. The check needs no seed, wallet address, or API key.
+
+```python
+from fragment_api import FragmentAPI
+
+api = FragmentAPI()
+check = api.check_stars_availability("@telegram_user", 100, "gram")
+
+if not check.available:
+    print(check.message, check.action)
+    # Do not accept payment.
+```
+
+Run the check shortly before payment. It is a point-in-time validation, not a reservation or delivery guarantee. On `429`, wait for `retry_after`; on `503`, retry later and do not accept payment yet.
+
+| Code | Meaning |
+|---|---|
+| `AVAILABLE` | Continue to customer payment |
+| `RECIPIENT_NOT_FOUND` | Check the Telegram username |
+| `RECIPIENT_INELIGIBLE` | Do not accept payment for this recipient |
+| `PREMIUM_ALREADY_ACTIVE` | Use another recipient or retry after the subscription ends |
+| `PAYMENT_METHOD_UNAVAILABLE` | Use the payment method shown in `action` |
+
 ## Quick start
 
 ```bash
-pip install fragment-api-dev==1.2.1
+pip install fragment-api-dev==1.3.0
 ```
 
 ```python
@@ -72,6 +97,7 @@ The [`examples/`](examples/README.md) directory contains explained examples for:
 - 24-word wallets without a selector
 - 12-word wallets with an address or account index
 - Python SDK, Node.js, and curl
+- Recipient availability checks before customer payment
 
 USDT purchases require a small GRAM balance for TON network fees.
 
@@ -93,7 +119,7 @@ Then ask your coding agent:
 Use $fragment-api-integration to add Telegram Stars purchases to this project.
 ```
 
-The skill covers Python SDK and REST integrations, Stars and Premium, GRAM and USDT, wallet selection, idempotency, polling, and safe error handling.
+The skill covers pre-payment availability checks, Python SDK and REST integrations, Stars and Premium, GRAM and USDT, wallet selection, idempotency, polling, and safe error handling.
 
 ## Prices
 

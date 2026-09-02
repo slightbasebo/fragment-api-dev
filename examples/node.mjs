@@ -1,9 +1,6 @@
 import { randomUUID } from "node:crypto";
 
 const baseUrl = process.env.FRAGMENT_API_URL ?? "https://api-stars.duckdns.org";
-const seed = process.env.TON_WALLET_SEED;
-if (!seed) throw new Error("Set TON_WALLET_SEED");
-
 async function request(path, options) {
   const response = await fetch(`${baseUrl}${path}`, options);
   const body = await response.json();
@@ -13,11 +10,28 @@ async function request(path, options) {
   return body;
 }
 
-const payload = {
+const purchaseFields = {
   product: process.env.PRODUCT ?? "stars",
   username: process.env.TELEGRAM_USERNAME ?? "@telegram_user",
   amount: Number(process.env.AMOUNT ?? "50"),
   payment_method: process.env.PAYMENT_METHOD ?? "gram",
+};
+
+const availability = await request("/api/v1/availability/check", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify(purchaseFields),
+});
+if (!availability.available) {
+  console.error(availability.message, availability.action ?? "");
+  process.exit(2);
+}
+
+const seed = process.env.TON_WALLET_SEED;
+if (!seed) throw new Error("Set TON_WALLET_SEED");
+
+const payload = {
+  ...purchaseFields,
   seed,
   idempotency_key: process.env.IDEMPOTENCY_KEY ?? randomUUID(),
 };

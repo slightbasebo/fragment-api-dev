@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Fragment Stars & Premium API
-  version: 1.2.0
+  version: 1.3.0
   description: Buy Telegram Stars and Premium with GRAM or USDT on TON. No API key required.
   contact:
     name: Integration support
@@ -16,6 +16,60 @@ servers:
   - url: https://api-stars.duckdns.org
 security: []
 paths:
+  /api/v1/availability/check:
+    post:
+      operationId: checkPurchaseAvailability
+      summary: Check whether a recipient can receive Stars or Premium
+      description: >-
+        Run shortly before accepting customer payment. This point-in-time check does
+        not create a purchase, reserve a price, or require wallet credentials.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AvailabilityRequest'
+      responses:
+        '200':
+          description: Current availability result, including known business rejections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityResult'
+              examples:
+                available:
+                  summary: Recipient can receive the purchase
+                  value:
+                    available: true
+                    code: AVAILABLE
+                    message: The purchase can be created.
+                    checked_at: '2026-09-02T12:00:00.000Z'
+                recipientNotFound:
+                  summary: Username is unavailable for the selected product
+                  value:
+                    available: false
+                    code: RECIPIENT_NOT_FOUND
+                    message: Telegram user was not found or cannot receive Stars.
+                    action: Check the username before accepting payment.
+                    checked_at: '2026-09-02T12:00:00.000Z'
+        '400':
+          description: Invalid availability request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionableError'
+        '429':
+          description: Availability check rate or capacity limit reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetryableError'
+        '503':
+          description: Availability could not be determined safely
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionableError'
   /api/v1/purchases:
     post:
       operationId: createPurchase
@@ -170,6 +224,69 @@ paths:
                 $ref: '#/components/schemas/Health'
 components:
   schemas:
+    AvailabilityRequest:
+      type: object
+      additionalProperties: false
+      required: [product, username, amount, payment_method]
+      properties:
+        product:
+          type: string
+          enum: [stars, premium]
+        username:
+          type: string
+          pattern: '^@[A-Za-z0-9_]{1,32}$'
+        amount:
+          type: integer
+          description: Stars accepts 50 to 1,000,000; Premium accepts 3, 6, or 12 months.
+        payment_method:
+          type: string
+          enum: [gram, usdt]
+      allOf:
+        - if:
+            properties:
+              product:
+                const: stars
+          then:
+            properties:
+              amount:
+                minimum: 50
+                maximum: 1000000
+        - if:
+            properties:
+              product:
+                const: premium
+          then:
+            properties:
+              amount:
+                enum: [3, 6, 12]
+    AvailabilityResult:
+      type: object
+      additionalProperties: false
+      required: [available, code, message, checked_at]
+      properties:
+        available:
+          type: boolean
+        code:
+          type: string
+          description: >-
+            AVAILABLE means the shop can continue to payment; RECIPIENT_NOT_FOUND
+            means the username should be checked; RECIPIENT_INELIGIBLE means the
+            product cannot be delivered; PREMIUM_ALREADY_ACTIVE means the recipient
+            cannot receive that Premium gift now; PAYMENT_METHOD_UNAVAILABLE means
+            the caller should use the payment method stated in action.
+          enum:
+            - AVAILABLE
+            - RECIPIENT_NOT_FOUND
+            - RECIPIENT_INELIGIBLE
+            - PREMIUM_ALREADY_ACTIVE
+            - PAYMENT_METHOD_UNAVAILABLE
+        message:
+          type: string
+        action:
+          type: string
+        checked_at:
+          type: string
+          format: date-time
     Prices:
       type: object
       additionalProperties: false
@@ -464,6 +581,21 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/WalletSelectionExample'
+    RetryableError:
+      type: object
+      additionalProperties: false
+      required: [code, error, action, retry_after]
+      properties:
+        code:
+          type: string
+          enum: [AVAILABILITY_RATE_LIMITED, AVAILABILITY_BUSY]
+        error:
+          type: string
+        action:
+          type: string
+        retry_after:
+          type: integer
+          minimum: 1
   responses:
     InvalidPurchase:
       description: Invalid purchase or wallet selection

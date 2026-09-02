@@ -5,10 +5,25 @@ Use this reference when the client backend is Python.
 ## Install
 
 ```bash
-pip install fragment-api-dev==1.2.1
+pip install fragment-api-dev==1.3.0
 ```
 
 The SDK uses `https://api-stars.duckdns.org` by default and does not require an API key.
+
+## Check Before Customer Payment
+
+```python
+from fragment_api import FragmentAPI
+
+api = FragmentAPI()
+check = api.check_stars_availability("@telegram_user", 100, "gram")
+if not check.available:
+    print(check.message, check.action)
+    raise SystemExit(2)
+```
+
+For Premium, use `api.check_premium_availability("@telegram_user", 3, "usdt")`.
+The check never needs wallet credentials. Run it shortly before accepting payment. On `RateLimitError`, wait for `error.retry_after`; on `ServiceUnavailableError`, retry later and do not charge yet.
 
 ## Stars With GRAM
 
@@ -111,7 +126,7 @@ Money values are decimal strings. Do not convert them through binary `float` for
 - `failed`: expose the public error and action.
 - `reconciliation_required`: stop automatic processing and require reconciliation.
 
-Catch `FragmentAPIError` when the application needs structured `code` and `action` fields:
+Catch `FragmentAPIError` when the application needs structured `code`, `action`, and `retry_after` fields:
 
 ```python
 from fragment_api import FragmentAPIError
@@ -132,3 +147,4 @@ Do not return stack traces or request data to the end user.
 - [Premium with USDT](../../../examples/premium_usdt.py)
 - [12-word wallet by address](../../../examples/wallet_12_words_address.py)
 - [12-word wallet by index](../../../examples/wallet_12_words_index.py)
+- [Availability before payment](../../../examples/check_availability.py)

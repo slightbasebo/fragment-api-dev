@@ -2,13 +2,42 @@
 set -euo pipefail
 
 api_url="${FRAGMENT_API_URL:-https://api-stars.duckdns.org}"
+product="${PRODUCT:-stars}"
+amount="${AMOUNT:-50}"
+payment_method="${PAYMENT_METHOD:-gram}"
+username="${TELEGRAM_USERNAME:-@telegram_user}"
+
+availability_payload="$(PRODUCT="${product}" AMOUNT="${amount}" PAYMENT_METHOD="${payment_method}" TELEGRAM_USERNAME="${username}" python3 - <<'PY'
+import json
+import os
+
+print(json.dumps({
+    "product": os.environ["PRODUCT"],
+    "username": os.environ["TELEGRAM_USERNAME"],
+    "amount": int(os.environ["AMOUNT"]),
+    "payment_method": os.environ["PAYMENT_METHOD"],
+}))
+PY
+)"
+
+availability="$(curl --fail-with-body --silent --show-error \
+  "${api_url}/api/v1/availability/check" \
+  --request POST \
+  --header 'Content-Type: application/json' \
+  --data "${availability_payload}")"
+
+if [[ "$(python3 -c 'import json,sys; print(str(json.load(sys.stdin)["available"]).lower())' <<<"${availability}")" != "true" ]]; then
+  python3 -m json.tool <<<"${availability}"
+  exit 2
+fi
+
 : "${TON_WALLET_SEED:?Set TON_WALLET_SEED}"
 
 payload="$({
-  PRODUCT="${PRODUCT:-stars}" \
-  AMOUNT="${AMOUNT:-50}" \
-  PAYMENT_METHOD="${PAYMENT_METHOD:-gram}" \
-  TELEGRAM_USERNAME="${TELEGRAM_USERNAME:-@telegram_user}" \
+  PRODUCT="${product}" \
+  AMOUNT="${amount}" \
+  PAYMENT_METHOD="${payment_method}" \
+  TELEGRAM_USERNAME="${username}" \
   IDEMPOTENCY_KEY="${IDEMPOTENCY_KEY:-client-order-$(date +%s)-$$}" \
   python3 - <<'PY'
 import json

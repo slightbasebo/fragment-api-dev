@@ -7,7 +7,7 @@ Ready-to-run examples for buying Telegram Stars and Telegram Premium with GRAM o
 Install the Python SDK:
 
 ```bash
-pip install fragment-api-dev==1.2.1
+pip install fragment-api-dev==1.3.0
 ```
 
 Set the wallet seed and recipient on your backend:
@@ -18,6 +18,27 @@ export TELEGRAM_USERNAME="@telegram_user"
 ```
 
 Never put a wallet seed in browser or frontend code.
+
+## Check before accepting payment
+
+Use [`check_availability.py`](check_availability.py) before charging your customer:
+
+```bash
+python examples/check_availability.py
+```
+
+The check requires only product, username, amount, and payment method. It does not need wallet credentials and does not create a purchase.
+
+Correct shop flow:
+
+1. Check availability shortly before payment.
+2. If `available` is `false`, show `message` and `action` and do not charge.
+3. If the check returns `429`, wait for `retry_after`; if it returns `503`, retry later.
+4. Accept customer payment.
+5. Create one purchase with a stable `idempotency_key`.
+6. Save `purchase_id` and wait for a terminal status.
+
+The result is a point-in-time check, not a reservation or guarantee. The purchase can still fail later, so always handle its final status.
 
 ## Choose a product and payment method
 
@@ -87,6 +108,8 @@ The REST examples support both products, both payment methods, and optional wall
 |---|---|
 | curl | [`curl.sh`](curl.sh) |
 | Node.js 18+ | [`node.mjs`](node.mjs) |
+
+Both full REST examples run the availability check before creating the purchase.
 
 Select a product and payment method with environment variables:
 

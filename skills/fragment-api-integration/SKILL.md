@@ -1,6 +1,6 @@
 ---
 name: fragment-api-integration
-description: Integrate Telegram Stars or Telegram Premium purchases through Fragment API using the Python SDK or direct REST, including GRAM/USDT payments and 12-word or 24-word wallet selection.
+description: Integrate Telegram Stars or Telegram Premium purchases through Fragment API using the Python SDK or direct REST, including pre-payment availability checks, GRAM/USDT payments, and wallet selection.
 ---
 
 # Fragment API Integration
@@ -33,12 +33,15 @@ USDT purchases still require a small GRAM balance for TON network fees.
 ## Implement The Order Flow
 
 1. Validate product, amount, payment method, username, and wallet selector before creating an order.
-2. Derive a stable `idempotency_key` from the client's logical order ID. Reuse it for every retry of that same order.
-3. Create the purchase once.
-4. Persist `purchase_id` with the client's order before waiting or polling.
-5. Wait until `completed`, `failed`, or `reconciliation_required`.
-6. Treat only `completed` as success.
-7. Preserve public `code`, `error`, and `action` fields in client-visible failures without returning request bodies, stack traces, or credentials.
+2. Call the availability checker shortly before accepting customer payment. It uses only product, username, amount, and payment method; never send wallet credentials to it.
+3. Continue only when `available` is `true`. On `available: false`, show `message` and `action` and do not accept payment.
+4. On `429`, wait for `retry_after`. On `503`, retry later and do not accept payment yet.
+5. Accept customer payment, then derive a stable `idempotency_key` from the client's logical order ID. Reuse it for every retry of that same order.
+6. Create the purchase once and persist `purchase_id` before waiting or polling.
+7. Wait until `completed`, `failed`, or `reconciliation_required`; treat only `completed` as success.
+8. Preserve public `code`, `error`, `action`, and `retry_after` fields without returning request bodies, stack traces, or credentials.
+
+The availability result is a point-in-time check, not a reservation or guarantee. Keep the existing final purchase-failure handling.
 
 Never create a replacement order automatically after an ambiguous response. Query the saved `purchase_id` or retry the original request with the same `idempotency_key`. Never repeat an order in `reconciliation_required` automatically.
 

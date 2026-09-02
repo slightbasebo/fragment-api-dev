@@ -14,12 +14,31 @@ No API key or authentication header is required.
 
 ```text
 POST /api/v1/purchases
+POST /api/v1/availability/check
 GET  /api/v1/purchases/{purchase_id}
 POST /api/v1/wallets/resolve
 GET  /api/v1/prices
 GET  /api/v1/prices/quote?product=stars&amount=100
 GET  /health
 ```
+
+## Check Before Customer Payment
+
+```http
+POST /api/v1/availability/check
+Content-Type: application/json
+
+{
+  "product": "stars",
+  "username": "@telegram_user",
+  "amount": 100,
+  "payment_method": "gram"
+}
+```
+
+Continue to payment only when the response contains `"available": true`. For a known rejection, show `message` and `action` and do not charge. On `429`, wait for `retry_after`; on `503`, retry later and do not accept payment yet.
+
+This check needs no seed or wallet fields and does not create a purchase. It is a point-in-time validation, not a reservation or guarantee.
 
 ## Create A Purchase
 
