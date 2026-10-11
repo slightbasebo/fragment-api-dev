@@ -20,7 +20,7 @@ print(json.dumps({
 PY
 )"
 
-availability="$(curl --fail-with-body --silent --show-error \
+availability="$(curl --max-time 30 --fail-with-body --silent --show-error \
   "${api_url}/api/v1/availability/check" \
   --request POST \
   --header 'Content-Type: application/json' \
@@ -32,13 +32,14 @@ if [[ "$(python3 -c 'import json,sys; print(str(json.load(sys.stdin)["available"
 fi
 
 : "${TON_WALLET_SEED:?Set TON_WALLET_SEED}"
+order_key="${IDEMPOTENCY_KEY:-${SHOP_ORDER_ID:?Set SHOP_ORDER_ID to a stable shop order ID}}"
 
 payload="$({
   PRODUCT="${product}" \
   AMOUNT="${amount}" \
   PAYMENT_METHOD="${payment_method}" \
   TELEGRAM_USERNAME="${username}" \
-  IDEMPOTENCY_KEY="${IDEMPOTENCY_KEY:-client-order-$(date +%s)-$$}" \
+  IDEMPOTENCY_KEY="${order_key}" \
   python3 - <<'PY'
 import json
 import os
@@ -62,18 +63,23 @@ PY
 } )"
 
 purchase="$({
-  curl --fail-with-body --silent --show-error \
+  curl --max-time 30 --fail-with-body --silent --show-error \
     "${api_url}/api/v1/purchases" \
     --request POST \
     --header 'Content-Type: application/json' \
-    --data "${payload}"
+    --data-binary @- <<<"${payload}"
 } )"
 
 purchase_id="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["purchase_id"])' <<<"${purchase}")"
 echo "Purchase: ${purchase_id}"
 
+deadline=$((SECONDS + 300))
 while true; do
-  result="$(curl --fail-with-body --silent --show-error "${api_url}/api/v1/purchases/${purchase_id}")"
+  if (( SECONDS >= deadline )); then
+    echo "Status check timed out. Resume purchase ${purchase_id}; do not create a new order." >&2
+    exit 3
+  fi
+  result="$(curl --max-time 30 --fail-with-body --silent --show-error "${api_url}/api/v1/purchases/${purchase_id}")"
   status="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])' <<<"${result}")"
 
   if [[ "${status}" == "completed" || "${status}" == "failed" || "${status}" == "reconciliation_required" ]]; then

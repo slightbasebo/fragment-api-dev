@@ -57,4 +57,8 @@ Use the public prices endpoints or SDK price helpers for display and estimates. 
 
 Add unit tests around payload construction, idempotency reuse, status mapping, and public error handling. Mock paid purchase calls. Do not execute a paid test or deploy to production without explicit authorization.
 
+Start with [`prices.py`](../../examples/prices.py) to verify API access without wallet credentials. Use [`shop_minimal.py`](../../examples/shop_minimal.py) for the purchase step of a confirmed shop order. Its `fulfill_order()` returns the purchase so the caller can persist its ID before polling.
+
+All file-based purchase examples require a stable `SHOP_ORDER_ID` (REST also accepts `IDEMPOTENCY_KEY`). Never generate a fresh key automatically when a request times out.
+
 For maintained runnable examples, see [`examples/`](../../examples/README.md) and [`openapi.yaml`](../../openapi.yaml).

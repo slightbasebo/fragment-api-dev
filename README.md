@@ -2,18 +2,18 @@
 
 # Telegram Stars API & Telegram Premium API
 
-**Your shop. One API. Stars & Premium.**
+**Build your Telegram Stars bot or shop with Fragment API.**
 
 [![PyPI version](https://img.shields.io/pypi/v/fragment-api-dev?color=0ea5e9&label=Python%20SDK)](https://pypi.org/project/fragment-api-dev/)
 [![MIT license](https://img.shields.io/badge/license-MIT-0ea5e9)](LICENSE)
 
-Fragment API connects your shop, Telegram bot, or backend to Stars and Premium purchases through a Python SDK or REST API.
+Free Telegram Stars API and Telegram Premium API for bots, Stars shops, reseller services, and backends. Python SDK or REST: check a recipient, create an order, track delivery.
 
 **No API key. 0% API access fee. Pay with GRAM or USDT on TON.**
 
 The 0% fee applies to API access only. Purchase costs and TON network fees still apply. USDT purchases also need a small GRAM balance for network fees.
 
-[Documentation](https://stars-market.duckdns.org/api) | [Shop](https://stars-market.duckdns.org/) | [Health](https://api-stars.duckdns.org/health) | [Examples](examples/README.md)
+[Start integrating](https://stars-market.duckdns.org/api#quick-start) | [Examples](examples/README.md) | [Python SDK](https://pypi.org/project/fragment-api-dev/) | [Integration help](https://t.me/tondotdev)
 
 </div>
 
@@ -23,6 +23,16 @@ The 0% fee applies to API access only. Purchase costs and TON network fees still
 | Telegram Premium | 3, 6, or 12 months |
 
 API endpoint: `https://api-stars.duckdns.org`
+
+## Try the API
+
+Fetch a real price before connecting a wallet. No signup, API key, or purchase:
+
+```bash
+curl --max-time 30 --fail-with-body 'https://api-stars.duckdns.org/api/v1/prices/quote?product=stars&amount=50'
+```
+
+The response includes exact decimal strings in `prices.gram` and `prices.usdt`. Or run the [live API demo](https://stars-market.duckdns.org/api).
 
 ## Quick start
 
@@ -62,6 +72,8 @@ Only `completed` means success. After a timeout, query the saved purchase or ret
 
 ## Examples & integration
 
+- [Minimal shop backend](examples/shop_minimal.py): create a purchase for a confirmed shop order, using its stable ID.
+- [Test prices without wallet credentials](examples/prices.py).
 - [Python SDK 1.3.0](https://pypi.org/project/fragment-api-dev/1.3.0/) and [Stars/Premium examples](examples/README.md#python-sdk).
 - [REST examples: curl and Node.js](examples/README.md#rest-api) and [OpenAPI specification](openapi.yaml).
 - [Wallet selection](examples/README.md#choose-your-wallet): 24-word wallets, 12-word wallets, and account resolution.
@@ -70,6 +82,6 @@ Only `completed` means success. After a timeout, query the saved purchase or ret
 
 ## Support
 
-[Open an issue](https://github.com/slightbasebo/fragment-api-dev/issues) or contact [@tondotdev](https://t.me/tondotdev). Report security concerns privately through [SECURITY.md](SECURITY.md); never post wallet credentials. Code and examples: [MIT license](LICENSE).
+Building a Telegram bot, Stars shop, or reseller backend? [Contact @tondotdev for integration help](https://t.me/tondotdev) or [open an issue](https://github.com/slightbasebo/fragment-api-dev/issues). Mention your language and intended product. Never post wallet credentials; report security concerns privately through [SECURITY.md](SECURITY.md). Code and examples: [MIT license](LICENSE).
 
 **LIKE IT? STAR IT!** Help other Telegram bot and shop developers find the API.

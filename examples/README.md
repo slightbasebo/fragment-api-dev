@@ -6,6 +6,13 @@ Integrate Telegram Stars and Telegram Premium purchases with Python, curl, or No
 
 ## Setup
 
+From the repository root, try prices first with Python 3.10+, without any wallet credentials:
+
+```bash
+python -m pip install fragment-api-dev==1.3.0
+python examples/prices.py
+```
+
 Run file-based examples from the repository root. Python examples need Python 3.10+:
 
 ```bash
@@ -106,6 +113,23 @@ print(result.status, result.transaction_hash or result.error)
 
 Printing an ID is not durable storage. In your application, save it in the order record before `api.wait()`. See [results and retries](#results-and-retries) for timeout recovery.
 
+Choose the example matching your integration:
+
+| Goal | Example |
+|---|---|
+| Test the API without a wallet | [`prices.py`](prices.py) |
+| Purchase step for a paid shop order | [`shop_minimal.py`](shop_minimal.py) |
+| Check a recipient before charging | [`check_availability.py`](check_availability.py) |
+
+`shop_minimal.py` accepts both products, both payment methods, and optional wallet selectors. Run it with the setup variables above. Its `fulfill_order()` function creates a purchase and returns its ID; save that ID in your shop database before polling. Customer payment collection stays in your shop. Availability must be checked before charging; only call fulfillment after confirmed payment.
+
+```bash
+export PRODUCT=stars AMOUNT=100 PAYMENT_METHOD=usdt
+python examples/shop_minimal.py
+```
+
+For Premium, set `PRODUCT=premium` and `AMOUNT=3`, `6`, or `12`. Keep `SHOP_ORDER_ID` unchanged when retrying the same order. If a saved purchase needs reconciliation, inspect that purchase instead of creating a replacement.
+
 Focused scripts show SDK method signatures:
 
 | Purchase | GRAM | USDT on TON |
@@ -113,7 +137,7 @@ Focused scripts show SDK method signatures:
 | 50 Stars: `buy_stars(amount=50, ...)` | [`stars_gram.py`](stars_gram.py) | [`stars_usdt.py`](stars_usdt.py) |
 | 3 months: `buy_premium(months=3, ...)` | [`premium_gram.py`](premium_gram.py) | [`premium_usdt.py`](premium_usdt.py) |
 
-**These small Python purchase scripts, including the wallet scripts below, are call-shape demos, not retry-safe shop flows. They skip availability checks and omit `idempotency_key`; the SDK generates a new key on every run. Setting `SHOP_ORDER_ID` alone does not change them. Before use, add `idempotency_key=os.environ["SHOP_ORDER_ID"]` to their purchase call and integrate the flow above.** Their amounts and payment methods are fixed in code, not selected by `PRODUCT`, `AMOUNT`, or `PAYMENT_METHOD`.
+These small Python scripts require `SHOP_ORDER_ID` and pass it as the idempotency key. Their quantities and payment methods are fixed in code. They skip the pre-payment availability step; use the flow above when integrating a shop. Reuse the same key for retries and save the returned purchase ID.
 
 ## Choose your wallet
 
@@ -164,7 +188,7 @@ export IDEMPOTENCY_KEY="${SHOP_ORDER_ID:?Set SHOP_ORDER_ID from your shop order}
 bash examples/curl.sh
 ```
 
-Alternatively, run `node examples/node.mjs` instead of the last command. Both scripts read `IDEMPOTENCY_KEY`, not `SHOP_ORDER_ID`, and generate a fresh key when it is omitted. Never omit it for a retry. Do not run both examples as separate purchases for one customer order.
+Alternatively, run `node examples/node.mjs` instead of the last command. Both scripts accept `IDEMPOTENCY_KEY` or `SHOP_ORDER_ID` and require a stable key. They stop polling after 5 minutes; a timeout does not mean failure. Resume the saved purchase ID or retry creation with its original key. Do not run both examples as separate purchases for one customer order.
 
 `FRAGMENT_API_URL` overrides the base URL in the file-based examples. Do not point credential-bearing requests at an untrusted host.
 
