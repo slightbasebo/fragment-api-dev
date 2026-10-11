@@ -1,0 +1,2 @@
+fragment-api-dev[async]==1.4.0
+aiogram>=3.13,<4

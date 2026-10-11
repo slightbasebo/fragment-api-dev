@@ -9,6 +9,9 @@ Integrate the API into the user's existing backend with the smallest change that
 
 ## Choose The Client
 
+SDK 1.4.0 supports sync `FragmentAPI` and async `AsyncFragmentAPI` (`pip install "fragment-api-dev[async]==1.4.0"`). Use async calls in bot handlers; close the async client with `async with`.
+
+
 - For Python, read [Python SDK](references/python-sdk.md) and use `fragment-api-dev`.
 - For other backend languages, read [REST API](references/rest-api.md).
 - Keep the user's current framework, storage, queue, and HTTP client unless a change is necessary for the integration.
@@ -51,6 +54,10 @@ For a 12-word seed with a known address but unknown index, call the wallet resol
 
 If both address and index are supplied, pass both so the API verifies the exact wallet selection.
 
+## Client-Signed Checkout
+
+Use `/api/v1/checkouts` when the caller keeps signing in its own wallet. Send product, username, amount, payment_method, payer_address, and a stable idempotency key. Never send a seed in this flow. Review and sign the returned transaction only while payable, submit the signed BOC, and poll the checkout ID. See [checkout guide](../../docs/client-signed-checkout.md).
+
 ## Prices And Testing
 
 Use the public prices endpoints or SDK price helpers for display and estimates. Quotes are informational and do not reserve the final Fragment price.
@@ -60,5 +67,7 @@ Add unit tests around payload construction, idempotency reuse, status mapping, a
 Start with [`prices.py`](../../examples/prices.py) to verify API access without wallet credentials. Use [`shop_minimal.py`](../../examples/shop_minimal.py) for the purchase step of a confirmed shop order. Its `fulfill_order()` returns the purchase so the caller can persist its ID before polling.
 
 All file-based purchase examples require a stable `SHOP_ORDER_ID` (REST also accepts `IDEMPOTENCY_KEY`). Never generate a fresh key automatically when a request times out.
+
+For persistent integrations, use [aiogram](../../examples/starters/aiogram) or [Node.js](../../examples/starters/node). Test error paths with the [local mock](../../examples/mock_server.py) before an authorized real purchase.
 
 For maintained runnable examples, see [`examples/`](../../examples/README.md) and [`openapi.yaml`](../../openapi.yaml).

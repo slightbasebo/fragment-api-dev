@@ -4,12 +4,20 @@ Integrate Telegram Stars and Telegram Premium purchases with Python, curl, or No
 
 [Quick start](../README.md#quick-start) | [Documentation](https://stars-market.duckdns.org/api) | [OpenAPI](../openapi.yaml) | [AI skill](#ai-assisted-integration)
 
+## Complete starters
+
+- [aiogram 3](starters/aiogram): async calls, persistent orders, mock-first setup.
+- [Node.js](starters/node): persistent orders and restart recovery.
+- [Mock API](mock_server.py): local synthetic success, failure, timeout, rate-limit, and reconciliation scenarios.
+
+Use these starters when your integration needs durable recovery. The focused scripts below demonstrate individual calls.
+
 ## Setup
 
 From the repository root, try prices first with Python 3.10+, without any wallet credentials:
 
 ```bash
-python -m pip install fragment-api-dev==1.3.0
+python -m pip install fragment-api-dev==1.4.0
 python examples/prices.py
 ```
 
@@ -18,7 +26,7 @@ Run file-based examples from the repository root. Python examples need Python 3.
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install fragment-api-dev==1.3.0
+python -m pip install fragment-api-dev==1.4.0
 export TELEGRAM_USERNAME="@your_recipient"
 export SHOP_ORDER_ID="your-shop:order-1001"
 export PRODUCT=stars AMOUNT=50 PAYMENT_METHOD=gram

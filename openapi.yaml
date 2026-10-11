@@ -1,8 +1,9 @@
 openapi: 3.1.0
 info:
   title: Fragment Stars & Premium API
-  version: 1.3.0
-  description: Buy Telegram Stars and Premium with GRAM or USDT on TON. No API key required.
+  version: 1.4.0
+  description: Free Telegram Stars and Premium API. Python SDK or REST, GRAM/USDT on TON, wallet-backed
+    purchases or client-signed checkout. No API key.
   contact:
     name: Integration support
     url: https://github.com/slightbasebo/fragment-api-dev/issues
@@ -13,16 +14,15 @@ externalDocs:
   description: Quick start and examples
   url: https://github.com/slightbasebo/fragment-api-dev
 servers:
-  - url: https://api-stars.duckdns.org
+- url: https://api-stars.duckdns.org
 security: []
 paths:
   /api/v1/availability/check:
     post:
       operationId: checkPurchaseAvailability
       summary: Check whether a recipient can receive Stars or Premium
-      description: >-
-        Run shortly before accepting customer payment. This point-in-time check does
-        not create a purchase, reserve a price, or require wallet credentials.
+      description: Run shortly before accepting customer payment. This point-in-time check does not create
+        a purchase, reserve a price, or require wallet credentials.
       requestBody:
         required: true
         content:
@@ -97,13 +97,22 @@ paths:
           $ref: '#/components/responses/ServerError'
         '503':
           $ref: '#/components/responses/Unavailable'
+      parameters:
+      - &id001
+        name: X-Integration-Id
+        in: header
+        required: false
+        description: Optional UUID identifying your integration for private aggregate adoption reports.
+          Not an API key. Omit to opt out. Never use wallet data as this value.
+        schema:
+          type: string
+          format: uuid
   /api/v1/wallets/resolve:
     post:
       operationId: resolveWallet
       summary: Find or verify a 12-word wallet account
-      description: >-
-        Send seed with wallet_address to find its account index, seed with account_index
-        to use V5R1 at that index, or all three fields to verify an exact wallet.
+      description: Send seed with wallet_address to find its account index, seed with account_index to
+        use V5R1 at that index, or all three fields to verify an exact wallet.
       requestBody:
         required: true
         content:
@@ -123,8 +132,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                  - $ref: '#/components/schemas/ActionableError'
-                  - $ref: '#/components/schemas/PublicError'
+                - $ref: '#/components/schemas/ActionableError'
+                - $ref: '#/components/schemas/PublicError'
         '429':
           description: Wallet resolver capacity exceeded
           content:
@@ -138,12 +147,12 @@ paths:
       operationId: getPurchase
       summary: Get purchase status
       parameters:
-        - name: purchase_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      - name: purchase_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
         '200':
           description: Current purchase state
@@ -179,19 +188,21 @@ paths:
       summary: Get a Stars or Premium price quote
       description: The quote is informational and is not fixed for a later purchase.
       parameters:
-        - name: product
-          in: query
-          required: true
-          schema:
-            type: string
-            enum: [stars, premium]
-        - name: amount
-          in: query
-          required: true
-          description: Stars accepts 50 to 1,000,000; Premium accepts 3, 6, or 12 months.
-          schema:
-            type: integer
-            minimum: 3
+      - name: product
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - stars
+          - premium
+      - name: amount
+        in: query
+        required: true
+        description: Stars accepts 50 to 1,000,000; Premium accepts 3, 6, or 12 months.
+        schema:
+          type: integer
+          minimum: 3
       responses:
         '200':
           description: Price quote
@@ -222,64 +233,173 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Health'
+  /api/v1/checkouts:
+    post:
+      operationId: createCheckout
+      summary: Create a client-signed Stars or Premium checkout
+      description: Create a transaction for your wallet to review and sign. No seed is accepted. Retry
+        with the same key and exact selection. Do not pay after validUntil or automatically replace an
+        uncertain payment.
+      parameters:
+      - *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCheckout'
+      responses:
+        '200':
+          description: Prepared or recovered checkout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Checkout'
+        '400': &id004
+          description: Invalid request or mismatching signed transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicError'
+        '404': &id002
+          description: Checkout not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicError'
+        '409': &id005
+          description: Conflicting idempotency key or checkout state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicError'
+        '429': &id006
+          description: Rate limit or preparation capacity reached. Observe Retry-After and retry_after.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicError'
+        '503': &id007
+          description: Temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicError'
+  /api/v1/checkouts/{checkout_id}:
+    get:
+      operationId: getCheckout
+      summary: Track a client-signed checkout
+      parameters:
+      - &id003
+        name: checkout_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Checkout delivery state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Checkout'
+        '404': *id002
+  /api/v1/checkouts/{checkout_id}/submitted:
+    post:
+      operationId: submitCheckout
+      summary: Submit the signed wallet result for verification
+      parameters:
+      - *id003
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitCheckout'
+      responses:
+        '200':
+          description: Recorded submission; completed is required for delivery
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Checkout'
+        '400': *id004
+        '404': *id002
+        '409': *id005
+        '429': *id006
+        '503': *id007
 components:
   schemas:
     AvailabilityRequest:
       type: object
       additionalProperties: false
-      required: [product, username, amount, payment_method]
+      required:
+      - product
+      - username
+      - amount
+      - payment_method
       properties:
         product:
           type: string
-          enum: [stars, premium]
+          enum:
+          - stars
+          - premium
         username:
           type: string
-          pattern: '^@[A-Za-z0-9_]{1,32}$'
+          pattern: ^@[A-Za-z0-9_]{1,32}$
         amount:
           type: integer
           description: Stars accepts 50 to 1,000,000; Premium accepts 3, 6, or 12 months.
         payment_method:
           type: string
-          enum: [gram, usdt]
+          enum:
+          - gram
+          - usdt
       allOf:
-        - if:
-            properties:
-              product:
-                const: stars
-          then:
-            properties:
-              amount:
-                minimum: 50
-                maximum: 1000000
-        - if:
-            properties:
-              product:
-                const: premium
-          then:
-            properties:
-              amount:
-                enum: [3, 6, 12]
+      - if:
+          properties:
+            product:
+              const: stars
+        then:
+          properties:
+            amount:
+              minimum: 50
+              maximum: 1000000
+      - if:
+          properties:
+            product:
+              const: premium
+        then:
+          properties:
+            amount:
+              enum:
+              - 3
+              - 6
+              - 12
     AvailabilityResult:
       type: object
       additionalProperties: false
-      required: [available, code, message, checked_at]
+      required:
+      - available
+      - code
+      - message
+      - checked_at
       properties:
         available:
           type: boolean
         code:
           type: string
-          description: >-
-            AVAILABLE means the shop can continue to payment; RECIPIENT_NOT_FOUND
-            means the username should be checked; RECIPIENT_INELIGIBLE means the
-            product cannot be delivered; PREMIUM_ALREADY_ACTIVE means the recipient
-            cannot receive that Premium gift now; PAYMENT_METHOD_UNAVAILABLE means
+          description: AVAILABLE means the shop can continue to payment; RECIPIENT_NOT_FOUND means the
+            username should be checked; RECIPIENT_INELIGIBLE means the product cannot be delivered; PREMIUM_ALREADY_ACTIVE
+            means the recipient cannot receive that Premium gift now; PAYMENT_METHOD_UNAVAILABLE means
             the caller should use the payment method stated in action.
           enum:
-            - AVAILABLE
-            - RECIPIENT_NOT_FOUND
-            - RECIPIENT_INELIGIBLE
-            - PREMIUM_ALREADY_ACTIVE
-            - PAYMENT_METHOD_UNAVAILABLE
+          - AVAILABLE
+          - RECIPIENT_NOT_FOUND
+          - RECIPIENT_INELIGIBLE
+          - PREMIUM_ALREADY_ACTIVE
+          - PAYMENT_METHOD_UNAVAILABLE
         message:
           type: string
         action:
@@ -290,7 +410,9 @@ components:
     Prices:
       type: object
       additionalProperties: false
-      required: [gram, usdt]
+      required:
+      - gram
+      - usdt
       properties:
         gram:
           type: string
@@ -301,7 +423,9 @@ components:
     StarsPrice:
       type: object
       additionalProperties: false
-      required: [amount, prices]
+      required:
+      - amount
+      - prices
       properties:
         amount:
           type: integer
@@ -311,17 +435,25 @@ components:
     PremiumPrice:
       type: object
       additionalProperties: false
-      required: [months, prices]
+      required:
+      - months
+      - prices
       properties:
         months:
           type: integer
-          enum: [3, 6, 12]
+          enum:
+          - 3
+          - 6
+          - 12
         prices:
           $ref: '#/components/schemas/Prices'
     PriceCatalog:
       type: object
       additionalProperties: false
-      required: [stars, premium, stale]
+      required:
+      - stars
+      - premium
+      - stale
       properties:
         stars:
           $ref: '#/components/schemas/StarsPrice'
@@ -335,11 +467,17 @@ components:
     PriceQuote:
       type: object
       additionalProperties: false
-      required: [product, amount, prices, stale]
+      required:
+      - product
+      - amount
+      - prices
+      - stale
       properties:
         product:
           type: string
-          enum: [stars, premium]
+          enum:
+          - stars
+          - premium
         amount:
           type: integer
         prices:
@@ -350,10 +488,10 @@ components:
     WalletResolutionRequest:
       type: object
       additionalProperties: false
-      required: [seed]
-      description: >-
-        A 12-word seed requires wallet_address or account_index. Send both selectors
-        to verify an exact wallet.
+      required:
+      - seed
+      description: A 12-word seed requires wallet_address or account_index. Send both selectors to verify
+        an exact wallet.
       properties:
         seed:
           type: string
@@ -369,12 +507,16 @@ components:
           maximum: 100
           description: Known account index. Without wallet_address, V5R1 is selected.
       anyOf:
-        - required: [wallet_address]
-        - required: [account_index]
+      - required:
+        - wallet_address
+      - required:
+        - account_index
     WalletAddresses:
       type: object
       additionalProperties: false
-      required: [v4, v5r1]
+      required:
+      - v4
+      - v5r1
       properties:
         v4:
           type: string
@@ -384,18 +526,20 @@ components:
       type: object
       additionalProperties: false
       required:
-        - wallet_address
-        - wallet_version
-        - account_index
-        - derivation_path
-        - addresses
+      - wallet_address
+      - wallet_version
+      - account_index
+      - derivation_path
+      - addresses
       properties:
         wallet_address:
           type: string
           description: The exact wallet selected by the request.
         wallet_version:
           type: string
-          enum: [v4, v5r1]
+          enum:
+          - v4
+          - v5r1
         account_index:
           type: integer
           minimum: 0
@@ -409,25 +553,29 @@ components:
       type: object
       additionalProperties: false
       required:
-        - product
-        - username
-        - amount
-        - payment_method
-        - seed
-        - idempotency_key
+      - product
+      - username
+      - amount
+      - payment_method
+      - seed
+      - idempotency_key
       properties:
         product:
           type: string
-          enum: [stars, premium]
+          enum:
+          - stars
+          - premium
         username:
           type: string
-          pattern: '^@[A-Za-z0-9_]{1,32}$'
+          pattern: ^@[A-Za-z0-9_]{1,32}$
         amount:
           type: integer
           minimum: 1
         payment_method:
           type: string
-          enum: [gram, usdt]
+          enum:
+          - gram
+          - usdt
         seed:
           type: string
           minLength: 1
@@ -444,28 +592,34 @@ components:
           type: string
           minLength: 1
           maxLength: 128
-          pattern: '^[ -~]+$'
+          pattern: ^[ -~]+$
       allOf:
-        - if:
-            properties:
-              product:
-                const: stars
-          then:
-            properties:
-              amount:
-                minimum: 50
-        - if:
-            properties:
-              product:
-                const: premium
-          then:
-            properties:
-              amount:
-                enum: [3, 6, 12]
+      - if:
+          properties:
+            product:
+              const: stars
+        then:
+          properties:
+            amount:
+              minimum: 50
+      - if:
+          properties:
+            product:
+              const: premium
+        then:
+          properties:
+            amount:
+              enum:
+              - 3
+              - 6
+              - 12
     PurchaseAccepted:
       type: object
       additionalProperties: false
-      required: [purchase_id, status, status_url]
+      required:
+      - purchase_id
+      - status
+      - status_url
       properties:
         purchase_id:
           type: string
@@ -478,15 +632,15 @@ components:
       type: object
       additionalProperties: false
       required:
-        - purchase_id
-        - status
-        - product
-        - username
-        - amount
-        - payment_method
-        - error
-        - created_at
-        - updated_at
+      - purchase_id
+      - status
+      - product
+      - username
+      - amount
+      - payment_method
+      - error
+      - created_at
+      - updated_at
       properties:
         purchase_id:
           type: string
@@ -495,20 +649,24 @@ components:
           $ref: '#/components/schemas/PurchaseStatus'
         product:
           type: string
-          enum: [stars, premium]
+          enum:
+          - stars
+          - premium
         username:
           type: string
         amount:
           type: integer
         payment_method:
           type: string
-          enum: [gram, usdt]
+          enum:
+          - gram
+          - usdt
         transaction_hash:
           type: string
         error:
           oneOf:
-            - type: 'null'
-            - $ref: '#/components/schemas/PurchaseError'
+          - type: 'null'
+          - $ref: '#/components/schemas/PurchaseError'
         created_at:
           type: string
           format: date-time
@@ -518,18 +676,20 @@ components:
     PurchaseStatus:
       type: string
       enum:
-        - queued
-        - preparing
-        - sending
-        - submitted
-        - confirming
-        - completed
-        - failed
-        - reconciliation_required
+      - queued
+      - preparing
+      - sending
+      - submitted
+      - confirming
+      - completed
+      - failed
+      - reconciliation_required
     PurchaseError:
       type: object
       additionalProperties: false
-      required: [code, message]
+      required:
+      - code
+      - message
       properties:
         code:
           type: string
@@ -538,25 +698,31 @@ components:
     Health:
       type: object
       additionalProperties: false
-      required: [status, timestamp]
+      required:
+      - status
+      - timestamp
       properties:
         status:
           type: string
-          enum: [ok, unavailable]
+          enum:
+          - ok
+          - unavailable
         timestamp:
           type: string
           format: date-time
     PublicError:
       type: object
       additionalProperties: false
-      required: [error]
+      required:
+      - error
       properties:
         error:
           type: string
     WalletSelectionExample:
       type: object
       additionalProperties: false
-      required: [seed]
+      required:
+      - seed
       properties:
         seed:
           type: string
@@ -569,7 +735,10 @@ components:
     ActionableError:
       type: object
       additionalProperties: false
-      required: [code, error, action]
+      required:
+      - code
+      - error
+      - action
       properties:
         code:
           type: string
@@ -584,11 +753,17 @@ components:
     RetryableError:
       type: object
       additionalProperties: false
-      required: [code, error, action, retry_after]
+      required:
+      - code
+      - error
+      - action
+      - retry_after
       properties:
         code:
           type: string
-          enum: [AVAILABILITY_RATE_LIMITED, AVAILABILITY_BUSY]
+          enum:
+          - AVAILABILITY_RATE_LIMITED
+          - AVAILABILITY_BUSY
         error:
           type: string
         action:
@@ -596,6 +771,162 @@ components:
         retry_after:
           type: integer
           minimum: 1
+    CreateCheckout:
+      type: object
+      additionalProperties: false
+      required:
+      - product
+      - username
+      - amount
+      - payment_method
+      - payer_address
+      - idempotency_key
+      properties:
+        product:
+          type: string
+          enum:
+          - stars
+          - premium
+        username:
+          type: string
+          pattern: ^@[A-Za-z0-9_]{1,32}$
+        amount:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+        payment_method:
+          type: string
+          enum:
+          - gram
+          - usdt
+        payer_address:
+          type: string
+          description: TON wallet address that will sign and pay. No seed is accepted.
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[ -~]+$
+      allOf:
+      - if:
+          properties:
+            product:
+              const: stars
+        then:
+          properties:
+            amount:
+              minimum: 50
+              maximum: 1000000
+      - if:
+          properties:
+            product:
+              const: premium
+        then:
+          properties:
+            amount:
+              enum:
+              - 3
+              - 6
+              - 12
+    CheckoutStatus:
+      type: string
+      enum:
+      - quoting
+      - awaiting_payment
+      - submitted
+      - confirming
+      - completed
+      - expired
+      - failed
+      - reconciliation_required
+    TonConnectTransaction:
+      type: object
+      required:
+      - validUntil
+      - messages
+      properties:
+        validUntil:
+          type: integer
+          description: Unix timestamp in seconds. Do not pay after expiry.
+        messages:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+            - address
+            - amount
+            properties:
+              address:
+                type: string
+              amount:
+                type: string
+                pattern: ^[0-9]+$
+                description: Integer nanotons, including native value attached to a USDT transfer.
+              payload:
+                type: string
+                description: Base64 BOC payload; preserve unchanged.
+    Checkout:
+      type: object
+      required:
+      - checkout_id
+      - status
+      - product
+      - username
+      - amount
+      - payment_method
+      - error
+      - transaction_hash
+      - created_at
+      - updated_at
+      properties:
+        checkout_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/CheckoutStatus'
+        product:
+          type: string
+          enum:
+          - stars
+          - premium
+        username:
+          type: string
+        amount:
+          type: integer
+        payment_method:
+          type: string
+          enum:
+          - gram
+          - usdt
+        error:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/PurchaseError'
+        transaction_hash:
+          type:
+          - string
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        tonconnect_transaction:
+          oneOf:
+          - $ref: '#/components/schemas/TonConnectTransaction'
+          - type: 'null'
+    SubmitCheckout:
+      type: object
+      additionalProperties: false
+      required:
+      - boc
+      properties:
+        boc:
+          type: string
+          description: Signed BOC returned by the payer wallet. Never a seed or private key.
+          maxLength: 16384
   responses:
     InvalidPurchase:
       description: Invalid purchase or wallet selection
@@ -603,8 +934,8 @@ components:
         application/json:
           schema:
             oneOf:
-              - $ref: '#/components/schemas/PublicError'
-              - $ref: '#/components/schemas/ActionableError'
+            - $ref: '#/components/schemas/PublicError'
+            - $ref: '#/components/schemas/ActionableError'
     BadRequest:
       description: Invalid request
       content:

@@ -5,7 +5,7 @@ Use this reference when the client backend is Python.
 ## Install
 
 ```bash
-pip install fragment-api-dev==1.3.0
+pip install fragment-api-dev==1.4.0
 ```
 
 The SDK uses `https://api-stars.duckdns.org` by default and does not require an API key.

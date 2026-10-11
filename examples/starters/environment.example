@@ -1,0 +1,17 @@
+# Documentation only: neither starter automatically loads this file.
+STARTER_MODE=mock
+FRAGMENT_BASE_URL=http://127.0.0.1:8081
+STARTER_DB=orders-mock.sqlite
+STARTER_SHOP_ID=demo
+WORKER_CONCURRENCY=3
+REQUEST_TIMEOUT=5
+
+# Leave live access disabled until your backend verifies paid orders.
+STARTER_LIVE_CONFIRM=
+TON_WALLET_SEED=
+TON_ACCOUNT_INDEX=
+TON_WALLET_ADDRESS=
+
+# Only needed for the owner-only Telegram console; runtime secrets, not source.
+BOT_TOKEN=
+BOT_OWNER_ID=

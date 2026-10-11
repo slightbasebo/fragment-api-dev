@@ -1,0 +1,7 @@
+{
+  "name": "fragment-api-node-starter",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.18.0" },
+  "scripts": { "start": "node starter.mjs worker", "test": "node --test ../../tests/node.test.mjs" }
+}

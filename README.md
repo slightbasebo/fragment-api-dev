@@ -34,12 +34,20 @@ curl --max-time 30 --fail-with-body 'https://api-stars.duckdns.org/api/v1/prices
 
 The response includes exact decimal strings in `prices.gram` and `prices.usdt`. Or run the [live API demo](https://stars-market.duckdns.org/api).
 
+## Choose your integration
+
+- [Integration builder](https://stars-market.duckdns.org/api#quick-start): choose language, product, payment, and wallet; download matching setup files.
+- [aiogram starter](examples/starters/aiogram): async bot integration with persistent order recovery.
+- [Node.js starter](examples/starters/node): durable orders and safe retries.
+- [Client-signed checkout](docs/client-signed-checkout.md): approve transactions in your own wallet without sending a seed.
+- [Local mock](examples/mock_server.py): test success, failure, rate limiting, and uncertain results without funds.
+
 ## Quick start
 
 Python 3.10+. Install the SDK:
 
 ```bash
-pip install fragment-api-dev==1.3.0
+pip install fragment-api-dev==1.4.0
 ```
 
 This example buys **50 Stars with GRAM**. Set `TELEGRAM_USERNAME`, `TON_WALLET_SEED`, and a stable `SHOP_ORDER_ID` using the [setup guide](examples/README.md#setup). For 12-word seeds, see [wallet selection](examples/README.md#choose-your-wallet).
@@ -72,9 +80,11 @@ Only `completed` means success. After a timeout, query the saved purchase or ret
 
 ## Examples & integration
 
+- [Focused documentation](docs/README.md): Python, Premium, USDT, aiogram, wallets, and errors.
+- [Service checks](https://stars-market.duckdns.org/status) and [changelog](docs/changelog.md).
 - [Minimal shop backend](examples/shop_minimal.py): create a purchase for a confirmed shop order, using its stable ID.
 - [Test prices without wallet credentials](examples/prices.py).
-- [Python SDK 1.3.0](https://pypi.org/project/fragment-api-dev/1.3.0/) and [Stars/Premium examples](examples/README.md#python-sdk).
+- [Python SDK 1.4.0](https://pypi.org/project/fragment-api-dev/1.4.0/) and [Stars/Premium examples](examples/README.md#python-sdk).
 - [REST examples: curl and Node.js](examples/README.md#rest-api) and [OpenAPI specification](openapi.yaml).
 - [Wallet selection](examples/README.md#choose-your-wallet): 24-word wallets, 12-word wallets, and account resolution.
 - [Prices](examples/README.md#prices): GRAM/USDT quotes without creating a purchase; final prices are not reserved.
