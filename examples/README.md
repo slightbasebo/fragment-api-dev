@@ -1,137 +1,224 @@
 # Fragment API Examples
 
-Ready-to-run examples for buying Telegram Stars and Telegram Premium with GRAM or USDT on TON.
+Integrate Telegram Stars and Telegram Premium purchases with Python, curl, or Node.js. No API key. API base URL: `https://api-stars.duckdns.org`.
 
-## Before you start
+[Quick start](../README.md#quick-start) | [Documentation](https://stars-market.duckdns.org/api) | [OpenAPI](../openapi.yaml) | [AI skill](#ai-assisted-integration)
 
-Install the Python SDK:
+## Setup
 
-```bash
-pip install fragment-api-dev==1.3.0
-```
-
-Set the wallet seed and recipient on your backend:
+Run file-based examples from the repository root. Python examples need Python 3.10+:
 
 ```bash
-export TON_WALLET_SEED="your wallet seed"
-export TELEGRAM_USERNAME="@telegram_user"
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install fragment-api-dev==1.3.0
+export TELEGRAM_USERNAME="@your_recipient"
+export SHOP_ORDER_ID="your-shop:order-1001"
+export PRODUCT=stars AMOUNT=50 PAYMENT_METHOD=gram
 ```
 
-Never put a wallet seed in browser or frontend code.
+Replace the recipient and order ID with values from your shop. Keep the same ID and purchase fields for retries; use a different ID only for a different logical order. Keys must contain 1-128 printable ASCII characters. Namespace IDs by shop to avoid collisions.
 
-## Check before accepting payment
+**Purchase and wallet-resolution requests send your wallet credential to the API. Run them only on a trusted backend. Load `TON_WALLET_SEED` from backend environment variables or secret storage. Never put seeds or private keys in frontend code, logs, shell history, Git, issues, or AI chats. Purchase examples spend real funds.**
 
-Use [`check_availability.py`](check_availability.py) before charging your customer:
+For a manual Bash session, enter the seed without echoing it or recording it in shell history:
 
 ```bash
-python examples/check_availability.py
+read -rsp 'Wallet seed: ' TON_WALLET_SEED
+export TON_WALLET_SEED
+printf '\n'
 ```
 
-The check requires only product, username, amount, and payment method. It does not need wallet credentials and does not create a purchase.
+Supported settings:
 
-Correct shop flow:
+| Setting | Values |
+|---|---|
+| `PRODUCT=stars` | `AMOUNT=50` to `1000000` |
+| `PRODUCT=premium` | `AMOUNT=3`, `6`, or `12` months |
+| `PAYMENT_METHOD` | `gram` or `usdt` on TON |
 
-1. Check availability shortly before payment.
-2. If `available` is `false`, show `message` and `action` and do not charge.
-3. If the check returns `429`, wait for `retry_after`; if it returns `503`, retry later.
-4. Accept customer payment.
-5. Create one purchase with a stable `idempotency_key`.
-6. Save `purchase_id` and wait for a terminal status.
+0% API access fee does not mean free purchases: purchase costs and TON network fees still apply. USDT purchases also need a small GRAM balance for network fees.
 
-The result is a point-in-time check, not a reservation or guarantee. The purchase can still fail later, so always handle its final status.
+## Check before charging
 
-## Choose a product and payment method
+1. Check availability shortly before accepting customer payment, using the intended product, recipient, amount, and payment method.
+2. Continue only when `available` is `true`. Otherwise, show `message` and `action` without charging.
+3. On `429`, wait for `retry_after`; on `503` or a connection error, retry later without charging.
+4. Confirm customer payment in your own shop, then create the purchase using that shop order's stable key.
+5. Persist `purchase_id` with the shop order before polling. Only `completed` means success.
 
-These examples use a 24-word TON mnemonic or Base64 32-byte private key. No wallet address or account index is needed.
+The check needs no seed, wallet address, or API key. It does not create a purchase or reserve a price. Availability can change afterward; handle final purchase failures too.
 
-| What you want to buy | Payment | Example |
-|---|---|---|
-| Telegram Stars | GRAM | [`stars_gram.py`](stars_gram.py) |
-| Telegram Stars | USDT on TON | [`stars_usdt.py`](stars_usdt.py) |
-| Telegram Premium | GRAM | [`premium_gram.py`](premium_gram.py) |
-| Telegram Premium | USDT on TON | [`premium_usdt.py`](premium_usdt.py) |
-
-USDT purchases require a small GRAM balance for TON network fees.
-
-Run an example:
-
-```bash
-python examples/stars_gram.py
-```
-
-## Choose a wallet format
-
-| Wallet data you have | Example | Explanation |
-|---|---|---|
-| 24-word TON mnemonic or Base64 32-byte private key | [`wallet_24_words.py`](wallet_24_words.py) | Send only `seed` |
-| 12-word seed and wallet address | [`wallet_12_words_address.py`](wallet_12_words_address.py) | The API finds the account index |
-| 12-word seed and known account index | [`wallet_12_words_index.py`](wallet_12_words_index.py) | The API uses that account index |
-| 12-word seed and address, but index unknown | [`resolve_wallet.py`](resolve_wallet.py) | Resolve the index before purchase |
-
-For a 12-word seed with an address:
-
-```bash
-export TON_WALLET_SEED="your 12 words"
-export TON_WALLET_ADDRESS="UQ_YOUR_WALLET_ADDRESS"
-python examples/wallet_12_words_address.py
-```
-
-For a 12-word seed with a known index:
-
-```bash
-export TON_WALLET_SEED="your 12 words"
-export TON_ACCOUNT_INDEX=0
-python examples/wallet_12_words_index.py
-```
-
-A 12-word seed without `TON_WALLET_ADDRESS` or `TON_ACCOUNT_INDEX` cannot identify the intended wallet.
-
-Wallet selection works with every product and payment method. For example, Premium paid with USDT from a 12-word wallet can use its address:
+Run this standalone check with the setup variables above:
 
 ```python
-purchase = api.buy_premium(
-    username="@telegram_user",
-    months=6,
-    payment_method="usdt",
-    seed=os.environ["TON_WALLET_SEED"],
-    wallet_address=os.environ["TON_WALLET_ADDRESS"],
-)
+import os
+from fragment_api import FragmentAPI, FragmentAPIError, RateLimitError
+
+api = FragmentAPI()
+try:
+    check = api.check_availability(
+        product=os.environ["PRODUCT"],
+        username=os.environ["TELEGRAM_USERNAME"],
+        amount=int(os.environ["AMOUNT"]),
+        payment_method=os.environ["PAYMENT_METHOD"],
+    )
+except RateLimitError as error:
+    raise SystemExit(f"Do not charge. Retry after {error.retry_after} seconds.")
+except FragmentAPIError as error:
+    raise SystemExit(f"Do not charge. {error.code or ''} {error.action or str(error)}")
+
+if not check.available:
+    raise SystemExit(f"Do not charge. {check.message} {check.action or ''}")
+print("Available. Continue to your shop's payment step.")
 ```
 
-If the index is already known, replace `wallet_address=...` with `account_index=...`.
+The smaller [`check_availability.py`](check_availability.py) script checks **Stars only**, defaults to 100 Stars, and does not read `PRODUCT`. Set `AMOUNT` explicitly. It prints failures but is not an exit-code gate for a purchase command.
 
-## Direct REST API
+## Python SDK
 
-The REST examples support both products, both payment methods, and optional wallet selectors.
+After the pre-payment check and confirmed customer payment, use this purchase snippet. It reads the setup variables, supports both products, passes an explicit order key, and accepts optional wallet selectors:
 
-| Language | Example |
-|---|---|
-| curl | [`curl.sh`](curl.sh) |
-| Node.js 18+ | [`node.mjs`](node.mjs) |
+```python
+import os
+from fragment_api import FragmentAPI
 
-Both full REST examples run the availability check before creating the purchase.
+api = FragmentAPI()
+wallet = {}
+if os.environ.get("TON_WALLET_ADDRESS"):
+    wallet["wallet_address"] = os.environ["TON_WALLET_ADDRESS"]
+if os.environ.get("TON_ACCOUNT_INDEX"):
+    wallet["account_index"] = int(os.environ["TON_ACCOUNT_INDEX"])
 
-Select a product and payment method with environment variables:
+purchase = api.create_purchase(
+    product=os.environ["PRODUCT"],
+    username=os.environ["TELEGRAM_USERNAME"],
+    amount=int(os.environ["AMOUNT"]),
+    payment_method=os.environ["PAYMENT_METHOD"],
+    seed=os.environ["TON_WALLET_SEED"],
+    idempotency_key=os.environ["SHOP_ORDER_ID"],
+    **wallet,
+)
+print("Record purchase_id with your shop order:", purchase.purchase_id, flush=True)
+result = api.wait(purchase.purchase_id)
+print(result.status, result.transaction_hash or result.error)
+```
+
+Printing an ID is not durable storage. In your application, save it in the order record before `api.wait()`. See [results and retries](#results-and-retries) for timeout recovery.
+
+Focused scripts show SDK method signatures:
+
+| Purchase | GRAM | USDT on TON |
+|---|---|---|
+| 50 Stars: `buy_stars(amount=50, ...)` | [`stars_gram.py`](stars_gram.py) | [`stars_usdt.py`](stars_usdt.py) |
+| 3 months: `buy_premium(months=3, ...)` | [`premium_gram.py`](premium_gram.py) | [`premium_usdt.py`](premium_usdt.py) |
+
+**These small Python purchase scripts, including the wallet scripts below, are call-shape demos, not retry-safe shop flows. They skip availability checks and omit `idempotency_key`; the SDK generates a new key on every run. Setting `SHOP_ORDER_ID` alone does not change them. Before use, add `idempotency_key=os.environ["SHOP_ORDER_ID"]` to their purchase call and integrate the flow above.** Their amounts and payment methods are fixed in code, not selected by `PRODUCT`, `AMOUNT`, or `PAYMENT_METHOD`.
+
+## Choose your wallet
+
+| Wallet data | Purchase fields | Reference |
+|---|---|---|
+| 24-word TON mnemonic or Base64 32-byte private key | `seed` only | [`wallet_24_words.py`](wallet_24_words.py) |
+| 12-word seed and wallet address | `seed` + `wallet_address` | [`wallet_12_words_address.py`](wallet_12_words_address.py) |
+| 12-word seed and known account index | `seed` + `account_index` | [`wallet_12_words_index.py`](wallet_12_words_index.py) |
+
+A 12-word seed alone cannot identify the intended wallet. For the purchase snippet above, set one selector:
 
 ```bash
-export PRODUCT=premium
-export AMOUNT=3
-export PAYMENT_METHOD=usdt
+export TON_WALLET_ADDRESS="UQ_YOUR_WALLET_ADDRESS"
+```
+
+Or, if the account index is known:
+
+```bash
+export TON_ACCOUNT_INDEX=0
+```
+
+Replace placeholders with your actual wallet selection. Index range: `0..100`; index alone selects V5R1. If both selectors are set, the API verifies they match. Remove stale selector variables when switching wallets.
+
+To resolve an unknown index from a 12-word seed and address, set `TON_WALLET_SEED` and `TON_WALLET_ADDRESS`, then run:
+
+```bash
+python examples/resolve_wallet.py
+```
+
+[`resolve_wallet.py`](resolve_wallet.py) returns the address, index, and wallet version without buying anything. Wallet selection applies to both products and payment methods.
+
+## REST API
+
+No authentication header is required. Use the [OpenAPI specification](../openapi.yaml) for request and response schemas.
+
+| Client | Requirements | Example |
+|---|---|---|
+| curl | Bash, Python 3, curl with `--fail-with-body` | [`curl.sh`](curl.sh) |
+| Node.js | Node.js 18+ | [`node.mjs`](node.mjs) |
+
+Both scripts check availability, create a purchase, then poll its status. Neither collects customer payment nor durably saves the ID. In a shop, run the check before charging and persist the ID before polling.
+
+After setup, select the order and explicitly reuse its key:
+
+```bash
+export PRODUCT=premium AMOUNT=3 PAYMENT_METHOD=usdt
+export IDEMPOTENCY_KEY="${SHOP_ORDER_ID:?Set SHOP_ORDER_ID from your shop order}"
 bash examples/curl.sh
 ```
 
-Valid values:
+Alternatively, run `node examples/node.mjs` instead of the last command. Both scripts read `IDEMPOTENCY_KEY`, not `SHOP_ORDER_ID`, and generate a fresh key when it is omitted. Never omit it for a retry. Do not run both examples as separate purchases for one customer order.
 
-- `PRODUCT=stars`: `AMOUNT` is 50 to 1,000,000.
-- `PRODUCT=premium`: `AMOUNT` is 3, 6, or 12 months.
-- `PAYMENT_METHOD=gram` or `PAYMENT_METHOD=usdt`.
+`FRAGMENT_API_URL` overrides the base URL in the file-based examples. Do not point credential-bearing requests at an untrusted host.
 
-## Result handling
+## Prices
 
-Every purchase example waits until the order reaches a final status:
+Quotes need no wallet credentials and create no purchase:
 
-- `completed`: the purchase finished successfully.
-- `failed`: read the returned error and action.
-- `reconciliation_required`: do not create an automatic replacement order.
+```python
+from fragment_api import FragmentAPI
 
-Use a stable `idempotency_key` from your own order ID in production. Retrying the same logical order with the same key prevents duplicate purchases.
+api = FragmentAPI()
+stars = api.get_stars_price(100)
+premium = api.get_premium_price(3)
+print(stars.prices.gram, stars.prices.usdt, stars.stale)
+print(premium.prices.gram, premium.prices.usdt, premium.stale)
+```
+
+```bash
+curl --fail-with-body 'https://api-stars.duckdns.org/api/v1/prices/quote?product=stars&amount=100'
+```
+
+Prices are exact decimal strings; use decimal arithmetic, not binary `float`, for accounting. `stale=true` marks a cached fallback quote. Quotes are informational: Fragment creates a fresh quote when the purchase starts.
+
+## Results and retries
+
+| Result | What to do |
+|---|---|
+| `completed` | Mark the shop order delivered. |
+| `failed` | Inspect `result.error` (`code`, `message`) and handle the customer's order. |
+| `reconciliation_required` | Stop automatic processing and request reconciliation. Never create an automatic replacement order. |
+
+`api.wait()` stops at all three statuses; it does not raise an exception merely because a purchase failed. Its default timeout is 300 seconds. A timeout or connection error does not prove that the purchase failed.
+
+- Persist `purchase_id`; resume with `api.get_purchase(purchase_id)` or `api.wait(purchase_id)`.
+- If creation returned no ID, retry the original request with the same `idempotency_key` and unchanged fields. Never generate a new key to bypass uncertainty.
+- On `409`, inspect the existing order and key conflict; do not switch keys to force a purchase.
+- HTTP errors expose `code`, `action`, and `retry_after` when provided. Keep request bodies and wallet credentials out of error reports.
+
+## AI-assisted integration
+
+The [portable integration skill](../skills/fragment-api-integration/SKILL.md) covers Python, REST, availability, wallets, prices, idempotency, and polling. From the repository root, choose your agent:
+
+```bash
+mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
+cp -R skills/fragment-api-integration "${CODEX_HOME:-$HOME/.codex}/skills/"
+```
+
+For Claude:
+
+```bash
+mkdir -p "$HOME/.claude/skills"
+cp -R skills/fragment-api-integration "$HOME/.claude/skills/"
+```
+
+Ask: `Use $fragment-api-integration to add Telegram Stars purchases to this backend.`
+
+Never share wallet credentials with an AI agent. Let your backend load them at runtime. Support: [@tondotdev](https://t.me/tondotdev); security reports: [SECURITY.md](../SECURITY.md).
